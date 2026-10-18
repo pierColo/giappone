@@ -1,0 +1,8 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const html=fs.readFileSync('index.html','utf8');const scripts=[...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)];const seed=scripts.find(x=>x[1].includes('application/json'))[2];const js=scripts.find(x=>!x[1].includes('application/json'))[2];new vm.Script(js);
+const nodes=new Map();const node=id=>{if(!nodes.has(id))nodes.set(id,{textContent:id==='trip-data'?seed:'',value:'',innerHTML:'',dataset:{},classList:{remove(){},add(){},toggle(){}},setAttribute(){},addEventListener(){},showModal(){},close(){}});return nodes.get(id)};
+const context=vm.createContext({crypto:require('crypto').webcrypto,document:{getElementById:node,addEventListener(){}},localStorage:{getItem(){return null},setItem(){}},console,URL,Date,confirm:()=>true});vm.runInContext(js,context);
+vm.runInContext(`assertDummy=days.length`,context);assert.equal(context.assertDummy,20);assert(node('list').innerHTML.includes('class="timeline"'));assert(!node('list').innerHTML.includes('data-period='));
+vm.runInContext(`const first=days[0];first.events[0].time='18:30';first.events[1].time='08:00';if(ordered(first)[0].time!=='08:00')throw Error('Time sort');const restored=normalize(JSON.parse(JSON.stringify({days})));if(restored[0].events[0].time!=='18:30')throw Error('Roundtrip');if(safeUrl('javascript:alert(1)'))throw Error('Unsafe URL');`,context);
+console.log('PASS: runtime render, 20 days migrated, timeline markup, chronological sorting, backup roundtrip, URL safety.');
+fetch('http://localhost:3000').then(async r=>{assert.equal(r.status,200);assert((await r.text()).includes('timeline-styles'));console.log('PASS: local HTTP preview');});
